@@ -11,7 +11,7 @@ Add new overrides in `OVERRIDES` as you port more controllers.
 from django.urls import path
 
 from . import _generated_urls
-from .views import auth_views, core_views, customers, masters, sales_bill
+from .views import auth_views, core_views, customers, masters, sales_bill, stock
 
 
 # Map URL `name` -> hand-implemented view callable.
@@ -69,6 +69,12 @@ OVERRIDES = {
     "salesbill.save": sales_bill.save,
     "salesbill.cancelBill": sales_bill.cancel_bill,
     "salesbill.confirmBill": sales_bill.confirm_bill,
+
+    # stock (StockController)
+    "stock.index": stock.index,
+    "stock.update": stock.update,
+    "stock.stockList": stock.stock_list,
+    "stock.stockListData": stock.stock_list_data,
 }
 
 urlpatterns = [

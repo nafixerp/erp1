@@ -292,13 +292,24 @@ def save(request):
         if not created and bill.status == "cancelled":
             return JsonResponse({"ok": False, "message": "Cancelled bill cannot be modified."}, status=422)
 
+    # Deduct inventory on first save of a non-quotation bill. Re-saves and
+    # quotations don't trigger another deduction. Cancellation/edit-aware
+    # inventory recovery is a follow-up.
+    stock_summary = None
+    if created and not extra.get("is_quotation") and items:
+        from .stock import apply_sales_bill_deduction
+        stock_summary = apply_sales_bill_deduction(items)
+
     next_bill_no_value = _next_simple(bill.bill_type or "Gold")
-    return JsonResponse({
+    response = {
         "ok": True,
         "message": "Bill saved" if created else "Bill updated",
         "data": _map_bill(bill),
         "next_bill_no": next_bill_no_value,
-    })
+    }
+    if stock_summary is not None:
+        response["stock_adjustment"] = stock_summary
+    return JsonResponse(response)
 
 
 @csrf_exempt

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Opening Stock Entry{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">Opening Stock Entry</h2>
+    <a class="btn muted" href="/stock/list">Stock List &rarr;</a>
+  </div>
+
+  <form method="get" action="/stock/opening-stock"
+        style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <select name="stktype">
+      <option value="">— Direct on items —</option>
+      {% for st in stock_types %}
+        <option value="{{ st.code }}" {% if st.code == filters.stktype %}selected{% endif %}>
+          {{ st.code }} — {{ st.name }}
+        </option>
+      {% endfor %}
+    </select>
+    <select name="stock_view">
+      <option value="opening" {% if filters.stock_view == "opening" %}selected{% endif %}>Opening</option>
+      <option value="closing" {% if filters.stock_view == "closing" %}selected{% endif %}>Closing</option>
+    </select>
+    <select name="level">
+      <option value="1" {% if filters.level == 1 %}selected{% endif %}>Level 1 (main)</option>
+      <option value="2" {% if filters.level == 2 %}selected{% endif %}>Level 2 (B-stock)</option>
+    </select>
+    <select name="itype">
+      <option {% if filters.itype == "All" %}selected{% endif %}>All</option>
+      <option value="Gold" {% if filters.itype == "Gold" %}selected{% endif %}>Gold</option>
+      <option value="Silver" {% if filters.itype == "Silver" %}selected{% endif %}>Silver</option>
+      <option value="Diamond" {% if filters.itype == "Diamond" %}selected{% endif %}>Diamond</option>
+    </select>
+    {% if group_codes %}
+    <select name="grpcode">
+      <option value="">All groups</option>
+      {% for g in group_codes %}
+        <option value="{{ g.code }}" {% if g.code == filters.grpcode %}selected{% endif %}>{{ g.code }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <input type="text" name="search" value="{{ filters.search }}" placeholder="Search code/name…" style="flex:1; min-width:200px;">
+    <button class="btn" type="submit">Apply</button>
+  </form>
+
+  {% if message %}<div class="error">{{ message }}</div>{% endif %}
+
+  {% csrf_token %}
+  <form id="stk-form">
+    <input type="hidden" name="stktype" value="{{ filters.stktype }}">
+    <input type="hidden" name="level" value="{{ filters.level }}">
+    <input type="hidden" name="stock_view" value="{{ filters.stock_view }}">
+
+    <div style="margin-bottom:8px; display:flex; gap:14px;">
+      <label class="muted"><input type="checkbox" name="update_closing_also"> Update closing too</label>
+      <label class="muted"><input type="checkbox" name="same_stock"> Mirror level 1 ↔ 2</label>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Code</th><th>Name</th><th>Touch</th>
+        <th>Qty</th><th>Weight</th><th>Stone wgt</th><th>Stone amt</th><th>Dmd wgt</th>
+      </tr></thead>
+      <tbody>
+        {% for it in items %}
+        <tr data-code="{{ it.code }}">
+          <td>{{ it.code }}</td>
+          <td>{{ it.name }}</td>
+          <td>{{ it.touch }}</td>
+          <td><input type="number" step="0.001" name="qty" value="{{ it.cqty }}" style="width:80px;"></td>
+          <td><input type="number" step="0.001" name="weight" value="{{ it.cweight }}" style="width:90px;"></td>
+          <td><input type="number" step="0.001" name="stonewgt" value="{{ it.cstwgt }}" style="width:90px;"></td>
+          <td><input type="number" step="0.01" name="stoneamt" value="{{ it.cstoneamt }}" style="width:90px;"></td>
+          <td><input type="number" step="0.001" name="dmdwgt" value="{{ it.cdmdwgt }}" style="width:90px;"></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="muted">No items match the filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:14px; display:flex; gap:8px; align-items:center;">
+      <button class="btn" type="submit">Save Stock</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </form>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+
+document.getElementById('stk-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const items = [];
+  for (const tr of form.querySelectorAll('tbody tr[data-code]')) {
+    const inp = (n) => tr.querySelector(`input[name="${n}"]`);
+    items.push({
+      code: tr.dataset.code,
+      qty: parseFloat(inp('qty').value) || 0,
+      weight: parseFloat(inp('weight').value) || 0,
+      stonewgt: parseFloat(inp('stonewgt').value) || 0,
+      stoneamt: parseFloat(inp('stoneamt').value) || 0,
+      dmdwgt: parseFloat(inp('dmdwgt').value) || 0,
+    });
+  }
+  if (!items.length) { status.textContent = 'Nothing to save.'; return; }
+  status.style.color = '#374151';
+  status.textContent = 'Saving…';
+  const payload = {
+    stktype: form.elements.stktype.value,
+    level: parseInt(form.elements.level.value, 10) || 1,
+    stock_view: form.elements.stock_view.value,
+    update_closing_also: form.elements.update_closing_also.checked,
+    same_stock: form.elements.same_stock.checked,
+    items,
+  };
+  const r = await fetch('/stock/opening-stock/update', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const body = await r.json().catch(() => ({}));
+  status.style.color = body.success ? '#15803d' : '#b91c1c';
+  status.textContent = body.message || ('HTTP ' + r.status);
+});
+</script>
+{% endblock %}

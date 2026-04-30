@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">{{ title }}</h2>
+    <a class="btn muted" href="/stock/opening-stock">Opening Stock Entry &rarr;</a>
+  </div>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <select id="stktype">
+      <option value="">All stock types</option>
+      {% for st in stock_types %}
+        <option value="{{ st.code }}">{{ st.code }} — {{ st.name }}</option>
+      {% endfor %}
+    </select>
+    <select id="grpcode">
+      <option value="">All groups</option>
+      {% for g in group_codes %}<option value="{{ g.code }}">{{ g.code }}</option>{% endfor %}
+    </select>
+    <select id="metal_type">
+      <option>All</option><option>Gold</option><option>Silver</option><option>Diamond</option>
+    </select>
+    <select id="ornament_filter">
+      <option>All</option><option>Ornaments Only</option><option>Not Ornaments</option>
+    </select>
+    <select id="stock_filter">
+      <option>With Not Zero Stock</option>
+      <option>With Stock Only</option>
+      <option>With -ve Stock</option>
+      <option>With Zero Stock</option>
+      <option>All</option>
+    </select>
+    <select id="value_mode">
+      <option value="rate">Cost rate</option>
+      <option value="cost">Cost only</option>
+    </select>
+    <label class="muted"><input type="checkbox" id="no_weight"> By qty</label>
+    <label class="muted"><input type="checkbox" id="sort_on_code"> Sort by code</label>
+    <button class="btn" id="refresh">Refresh</button>
+  </div>
+
+  <div id="totals" style="display:flex; gap:24px; margin-bottom:10px;" class="muted"></div>
+
+  <table>
+    <thead><tr>
+      <th>Code</th><th>Name</th><th>Group</th><th>Type</th>
+      <th>Op qty</th><th>Op wgt</th><th>Qty</th><th>Weight</th>
+      <th>Stone wgt</th><th>Net wgt</th><th>Rate</th><th>Value</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="12" class="muted">Click Refresh to load.</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+const fmt = (v) => (Math.abs(v) < 0.0001 ? '' : Number(v).toFixed(3).replace(/\.?0+$/, ''));
+const money = (v) => (Number(v) || 0).toFixed(2);
+
+async function refresh() {
+  const params = new URLSearchParams({
+    stktype: document.getElementById('stktype').value,
+    grpcode: document.getElementById('grpcode').value,
+    metal_type: document.getElementById('metal_type').value,
+    ornament_filter: document.getElementById('ornament_filter').value,
+    stock_filter: document.getElementById('stock_filter').value,
+    value_mode: document.getElementById('value_mode').value,
+    no_weight: document.getElementById('no_weight').checked ? '1' : '0',
+    sort_on_code: document.getElementById('sort_on_code').checked ? '1' : '0',
+  });
+  const r = await fetch('/api/stock/list/data?' + params.toString());
+  const body = await r.json();
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  if (!body.rows || !body.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="muted">No rows match.</td></tr>';
+  }
+  for (const row of (body.rows || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.code}</td><td>${row.name}</td><td>${row.grpcode}</td><td>${row.itype}</td>
+      <td>${fmt(row.opqty)}</td><td>${fmt(row.opweight)}</td>
+      <td>${fmt(row.qty)}</td><td>${fmt(row.weight)}</td>
+      <td>${fmt(row.stonewgt)}</td><td>${fmt(row.netwgt)}</td>
+      <td>${money(row.rate)}</td><td>${money(row.value)}</td>`;
+    tbody.appendChild(tr);
+  }
+  const t = body.totals || {};
+  document.getElementById('totals').innerHTML =
+    `<div>Items: <b>${(body.rows || []).length}</b></div>` +
+    `<div>Qty: <b>${fmt(t.qty)}</b></div>` +
+    `<div>Weight: <b>${fmt(t.weight)}</b></div>` +
+    `<div>Net wgt: <b>${fmt(t.netwgt)}</b></div>` +
+    `<div>Value: <b>${money(t.value)}</b></div>` +
+    `<div>Gold wgt: <b>${fmt(t.gold_weight)}</b></div>` +
+    `<div>Silver wgt: <b>${fmt(t.silver_weight)}</b></div>`;
+}
+document.getElementById('refresh').addEventListener('click', refresh);
+refresh();
+</script>
+{% endblock %}
