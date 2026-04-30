@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ shop_name }}{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           margin: 0; background: #f4f5f7; color: #1f2937; }
+    header { background: #1e3a8a; color: #fff; padding: 12px 24px;
+             display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 18px; margin: 0; }
+    header .right { font-size: 14px; }
+    header a { color: #cbd5e1; text-decoration: none; margin-left: 16px; }
+    main { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            padding: 20px; margin-bottom: 20px; }
+    .btn { display: inline-block; padding: 8px 14px; background: #1e3a8a;
+           color: #fff; border: 0; border-radius: 4px; cursor: pointer;
+           text-decoration: none; font-size: 14px; }
+    .btn.muted { background: #6b7280; }
+    .btn.danger { background: #dc2626; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+    th { background: #f9fafb; font-weight: 600; color: #374151; }
+    input, select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 4px;
+                    font-size: 14px; box-sizing: border-box; }
+    .error { color: #b91c1c; background: #fee2e2; padding: 8px 12px;
+             border-radius: 4px; margin-bottom: 12px; }
+    .muted { color: #6b7280; font-size: 13px; }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  {% block layout %}
+  <header>
+    <h1>{{ shop_name }}</h1>
+    <div class="right">
+      {% if user_name %}
+        <span>{{ user_name }} ({{ user_code }})</span>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/logout">Logout</a>
+      {% endif %}
+    </div>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  {% endblock %}
+</body>
+</html>

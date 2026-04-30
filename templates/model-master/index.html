@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Model Master{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Model Master</h2>
+  <form id="model-form" style="display: flex; gap: 8px; margin-bottom: 16px;">
+    {% csrf_token %}
+    <select name="mtype">
+      <option value="M">Model</option>
+      <option value="S">Size</option>
+    </select>
+    <input type="text" name="name" placeholder="Name" maxlength="20" required style="flex:1;">
+    <button class="btn" type="submit">Add</button>
+  </form>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <div>
+      <h3>Models</h3>
+      <table><tbody>
+        {% for m in models %}<tr><td>{{ m.name }}</td>
+        <td style="width:80px;"><button class="btn danger" data-id="{{ m.id }}" type="button">x</button></td></tr>
+        {% empty %}<tr><td class="muted">No models.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div>
+      <h3>Sizes</h3>
+      <table><tbody>
+        {% for s in sizes %}<tr><td>{{ s.name }}</td>
+        <td style="width:80px;"><button class="btn danger" data-id="{{ s.id }}" type="button">x</button></td></tr>
+        {% empty %}<tr><td class="muted">No sizes.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+document.getElementById('model-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/models/save', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({mtype: fd.get('mtype'), name: fd.get('name')})
+  });
+  if (r.ok) location.reload();
+});
+document.querySelectorAll('button[data-id]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete?')) return;
+    await fetch('/models/delete', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+      body: JSON.stringify({id: btn.dataset.id})
+    });
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

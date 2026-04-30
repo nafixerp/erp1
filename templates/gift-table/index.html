@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Gift Table{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Gift Table</h2>
+  <form id="gt-form" style="display: flex; gap: 8px; margin-bottom: 16px;">
+    {% csrf_token %}
+    <input type="number" name="points" placeholder="Points" required>
+    <input type="text" name="particulars" placeholder="Particulars" maxlength="60" style="flex:1;">
+    <button class="btn" type="submit">Save</button>
+  </form>
+  <table>
+    <thead><tr><th>Points</th><th>Particulars</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.points }}</td>
+        <td>{{ r.particulars }}</td>
+        <td><button class="btn danger" data-pts="{{ r.points }}" type="button">Delete</button></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">No rows.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+document.getElementById('gt-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/gift-table/save', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({points: fd.get('points'), particulars: fd.get('particulars')})
+  });
+  if (r.ok) location.reload();
+});
+document.querySelectorAll('button[data-pts]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete?')) return;
+    await fetch('/gift-table/delete', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+      body: JSON.stringify({points: btn.dataset.pts})
+    });
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

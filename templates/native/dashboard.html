@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ shop_name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Welcome, {{ user_name|default:user_code }}</h2>
+  <p class="muted">ERP — Django port. The full menu is wired to ~800 routes;
+  most controllers are still stubbed and return HTTP 501 with a JSON/HTML
+  placeholder.</p>
+</div>
+<div class="card">
+  <h3 style="margin-top:0;">Implemented modules</h3>
+  <ul>
+    <li><a href="/item-master">Item Master</a></li>
+    <li><a href="/models">Model Master</a></li>
+    <li><a href="/stocktype">Stock Type Master</a></li>
+    <li><a href="/gift-table">Gift Table</a></li>
+  </ul>
+</div>
+{% endblock %}

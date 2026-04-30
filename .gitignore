@@ -1,0 +1,17 @@
+# Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+.env
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local extraction of original Laravel source — not part of the Django project.
+_laravel_src/

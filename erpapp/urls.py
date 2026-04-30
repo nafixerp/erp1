@@ -1,0 +1,55 @@
+"""
+Top-level URL conf for the ERP app.
+
+We:
+  1) hand-wire a small set of routes (login, logout, dashboard, root, healthz),
+  2) pull in every Laravel route from _generated_urls.py, but allow specific
+     `name=` keys to be overridden by hand-implemented views.
+
+Add new overrides in `OVERRIDES` as you port more controllers.
+"""
+from django.urls import path
+
+from . import _generated_urls
+from .views import auth_views, core_views, masters
+
+
+# Map URL `name` -> hand-implemented view callable.
+OVERRIDES = {
+    # auth + core
+    "nativeauth.showLogin": auth_views.show_login,
+    "nativeauth.login": auth_views.login,
+    "nativeauth.logout": auth_views.logout,
+    "nativedashboard.index": core_views.dashboard,
+
+    # masters
+    "itemmaster.index": masters.item_master__index,
+    "itemmaster.save": masters.item_master__save,
+    "itemmaster.delete": masters.item_master__delete,
+
+    "modelmaster.index": masters.model_master__index,
+    "modelmaster.save": masters.model_master__save,
+    "modelmaster.delete": masters.model_master__delete,
+    "modelmaster.checkDuplicate": masters.model_master__check_duplicate,
+    "modelmaster.getByType": masters.model_master__get_by_type,
+
+    "stocktype.index": masters.stock_type__index,
+    "stocktype.getList": masters.stock_type__get_list,
+    "stocktype.getDefault": masters.stock_type__get_default,
+    "stocktype.checkCode": masters.stock_type__check_code,
+    "stocktype.store": masters.stock_type__store,
+    "stocktype.update": masters.stock_type__update,
+    "stocktype.destroy": masters.stock_type__destroy,
+
+    "gifttable.index": masters.gift_table__index,
+    "gifttable.save": masters.gift_table__save,
+    "gifttable.delete": masters.gift_table__delete,
+}
+
+urlpatterns = [
+    path("", core_views.root, name="root"),
+    path("login", auth_views.show_login, name="login"),
+    path("logout", auth_views.logout, name="logout"),
+    path("dashboard", core_views.dashboard, name="dashboard"),
+    path("healthz", core_views.healthz, name="healthz"),
+] + _generated_urls.build_patterns(view_overrides=OVERRIDES)

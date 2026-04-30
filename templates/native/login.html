@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Login — {{ shop_name }}{% endblock %}
+{% block layout %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg,#0f172a,#1e3a8a);">
+  <div class="card" style="width: 360px;">
+    <h2 style="margin-top:0;">{{ greeting }}</h2>
+    <div class="muted" style="margin-bottom: 16px;">{{ shop_name }}</div>
+    {% if shop_addr %}<div class="muted">{{ shop_addr }}</div>{% endif %}
+    {% if shop_phone %}<div class="muted">Phone: {{ shop_phone }}</div>{% endif %}
+    {% if shop_gst %}<div class="muted">GST: {{ shop_gst }}</div>{% endif %}
+
+    {% if error %}<div class="error" style="margin-top:14px;">{{ error }}</div>{% endif %}
+
+    <form method="post" action="/login" style="margin-top: 18px;">
+      {% csrf_token %}
+      <label for="password" class="muted">Password</label><br>
+      <input type="password" name="password" id="password" autofocus
+             style="width: 100%; margin: 6px 0 14px 0;">
+      <button class="btn" type="submit" style="width: 100%;">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

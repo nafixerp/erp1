@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Item Master{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Item Master</h2>
+
+  <form id="item-form" style="display: flex; gap: 8px; margin-bottom: 16px;">
+    {% csrf_token %}
+    <input type="text" name="code" placeholder="Code" maxlength="10" required>
+    <input type="text" name="name" placeholder="Name" maxlength="255" required style="flex:1;">
+    <button class="btn" type="submit">Save</button>
+  </form>
+
+  <table>
+    <thead><tr><th>Code</th><th>Name</th><th></th></tr></thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.code }}</td>
+        <td>{{ it.name }}</td>
+        <td><button class="btn danger" data-code="{{ it.code }}" type="button">Delete</button></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">No items.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+document.getElementById('item-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/item-master/save', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({code: fd.get('code'), name: fd.get('name')})
+  });
+  if (r.ok) location.reload();
+  else alert('Save failed: ' + (await r.text()));
+});
+document.querySelectorAll('button[data-code]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete ' + btn.dataset.code + '?')) return;
+    await fetch('/item-master/delete', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+      body: JSON.stringify({code: btn.dataset.code})
+    });
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

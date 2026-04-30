@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Not implemented{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Stub: {{ controller }}@{{ action }}</h2>
+  <p class="muted">This route is registered but the controller has not been
+  ported yet. Implement it by adding a function to <code>erpapp/views/</code>
+  and registering it in <code>OVERRIDES</code> in <code>erpapp/urls.py</code>.</p>
+  <p class="muted">Path: <code>{{ request.path }}</code></p>
+  <a class="btn muted" href="/dashboard">Back to dashboard</a>
+</div>
+{% endblock %}
