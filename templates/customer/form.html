@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}Edit{% else %}Add{% endif %} {{ type_info.title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">{% if is_edit %}Edit{% else %}Add{% endif %} {{ type_info.title }}</h2>
+  {% csrf_token %}
+
+  <form id="cust-form" autocomplete="off">
+    <input type="hidden" name="type" value="{{ type }}">
+    <input type="hidden" name="original_code" value="{{ data.code }}">
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <label>Code<br>
+        <input type="text" name="code" value="{{ data.code }}" maxlength="10" {% if is_edit %}readonly{% endif %} style="width:100%;">
+      </label>
+      <label>Name *<br>
+        <input type="text" name="name" value="{{ data.name|default:"" }}" maxlength="40" required style="width:100%;">
+      </label>
+      <label>Mobile<br>
+        <input type="text" name="mobile" value="{{ data.mobile|default:"" }}" maxlength="20" style="width:100%;">
+      </label>
+      <label>Telephone<br>
+        <input type="text" name="telephone" value="{{ data.telephone|default:"" }}" maxlength="20" style="width:100%;">
+      </label>
+      <label style="grid-column: span 2;">Address<br>
+        <input type="text" name="addr1" value="{{ data.addr1|default:"" }}" maxlength="120" style="width:100%;">
+      </label>
+      <label>City<br>
+        <input type="text" name="city" value="{{ data.city|default:"" }}" maxlength="50" style="width:100%;">
+      </label>
+      <label>State<br>
+        <input type="text" name="state" value="{{ data.state|default:"" }}" maxlength="30" style="width:100%;">
+      </label>
+      <label>PIN<br>
+        <input type="text" name="pin" value="{{ data.pin|default:"" }}" maxlength="10" style="width:100%;">
+      </label>
+      <label>Email<br>
+        <input type="email" name="email" value="{{ data.email|default:"" }}" maxlength="120" style="width:100%;">
+      </label>
+      <label>PAN / Aadhar<br>
+        <input type="text" name="panadhar" value="{{ data.panadhar|default:"" }}" maxlength="40" style="width:100%;">
+      </label>
+      <label>ID No<br>
+        <input type="text" name="idno" value="{{ data.idno|default:"" }}" maxlength="40" style="width:100%;">
+      </label>
+      <label>Group<br>
+        <input type="text" name="grp" value="{{ data.grp|default:"" }}" maxlength="3" style="width:100%;">
+      </label>
+      <label>Route<br>
+        <input type="text" name="route" value="{{ data.route|default:"" }}" maxlength="10" style="width:100%;">
+      </label>
+      <label>Opening Balance<br>
+        <input type="number" step="0.01" name="opbalance" value="{{ data.opbalance|default:"0" }}" style="width:100%;">
+      </label>
+      <label>Balance Type<br>
+        <select name="balance_type" style="width:100%;">
+          <option value="debit">Debit</option>
+          <option value="credit">Credit</option>
+        </select>
+      </label>
+      <label style="grid-column: span 2;">Note<br>
+        <textarea name="note" rows="2" style="width:100%;">{{ data.note|default:"" }}</textarea>
+      </label>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn" type="submit">{% if is_edit %}Update{% else %}Save{% endif %}</button>
+      <a class="btn muted" href="/customer?type={{ type }}&list=1">Back to list</a>
+      {% if not is_edit %}<button class="btn muted" id="next-code-btn" type="button">Get next code</button>{% endif %}
+    </div>
+
+    <div id="status" class="muted" style="margin-top:10px;"></div>
+  </form>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+
+async function api(path, opts={}) {
+  const r = await fetch(path, {
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json', ...(opts.headers||{})},
+    ...opts,
+  });
+  return {status: r.status, body: await r.json().catch(() => ({}))};
+}
+
+document.getElementById('cust-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  status.textContent = 'Saving...';
+  const fd = new FormData(e.target);
+  const payload = {};
+  for (const [k, v] of fd.entries()) payload[k] = v;
+  const r = await api('/api/customer/save', {method: 'POST', body: JSON.stringify(payload)});
+  if (r.body.success) {
+    status.style.color = '#15803d';
+    status.textContent = r.body.message || 'Saved';
+    setTimeout(() => location.href = '/customer?type={{ type }}&list=1', 600);
+  } else {
+    status.style.color = '#b91c1c';
+    status.textContent = r.body.message || ('HTTP ' + r.status);
+  }
+});
+
+const ncb = document.getElementById('next-code-btn');
+if (ncb) {
+  ncb.addEventListener('click', async () => {
+    const r = await api('/api/customer/next-code?type={{ type }}');
+    if (r.body.success) {
+      document.querySelector('input[name="code"]').value = r.body.code;
+    } else {
+      status.style.color = '#b91c1c';
+      status.textContent = r.body.message || 'Failed';
+    }
+  });
+}
+
+const mobileEl = document.querySelector('input[name="mobile"]');
+mobileEl.addEventListener('blur', async () => {
+  const phone = mobileEl.value.trim();
+  if (!phone) return;
+  const code = document.querySelector('input[name="code"]').value.trim();
+  const r = await api('/api/customer/check-phone?phone=' + encodeURIComponent(phone) + '&code=' + encodeURIComponent(code));
+  if (r.body.exists) {
+    status.style.color = '#b91c1c';
+    status.textContent = 'Phone already used by ' + r.body.details;
+  }
+});
+</script>
+{% endblock %}

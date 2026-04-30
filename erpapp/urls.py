@@ -11,7 +11,7 @@ Add new overrides in `OVERRIDES` as you port more controllers.
 from django.urls import path
 
 from . import _generated_urls
-from .views import auth_views, core_views, masters
+from .views import auth_views, core_views, customers, masters, sales_bill
 
 
 # Map URL `name` -> hand-implemented view callable.
@@ -44,6 +44,31 @@ OVERRIDES = {
     "gifttable.index": masters.gift_table__index,
     "gifttable.save": masters.gift_table__save,
     "gifttable.delete": masters.gift_table__delete,
+
+    # customer master (NativeCustomerController)
+    "nativecustomer.index": customers.index,
+    "nativecustomer.add": customers.add,
+    "nativecustomer.edit": customers.edit,
+    "nativecustomer.deletePage": customers.delete_page,
+    "nativecustomer.nextCode": customers.next_code,
+    "nativecustomer.get": customers.get,
+    "nativecustomer.save": customers.save,
+    "nativecustomer.delete": customers.delete,
+    "nativecustomer.checkPhone": customers.check_phone,
+    "nativecustomer.checkIdNo": customers.check_id_no,
+
+    # sales bill (SalesBillController)
+    "salesbill.index": sales_bill.index,
+    "salesbill.nextBillNo": sales_bill.next_bill_no,
+    "salesbill.checkBillNo": sales_bill.check_bill_no,
+    "salesbill.get": sales_bill.get,
+    "salesbill.search": sales_bill.search,
+    "salesbill.customerSearch": sales_bill.customer_search,
+    "salesbill.customerDetails": sales_bill.customer_details,
+    "salesbill.customerByMobile": sales_bill.customer_by_mobile,
+    "salesbill.save": sales_bill.save,
+    "salesbill.cancelBill": sales_bill.cancel_bill,
+    "salesbill.confirmBill": sales_bill.confirm_bill,
 }
 
 urlpatterns = [
@@ -52,4 +77,8 @@ urlpatterns = [
     path("logout", auth_views.logout, name="logout"),
     path("dashboard", core_views.dashboard, name="dashboard"),
     path("healthz", core_views.healthz, name="healthz"),
+
+    # Alias for the Laravel route `/sales-bill/{mode?}` whose optional segment
+    # got compiled to a required Django `<str:mode>`.
+    path("sales-bill", sales_bill.index, name="sales-bill.bare"),
 ] + _generated_urls.build_patterns(view_overrides=OVERRIDES)

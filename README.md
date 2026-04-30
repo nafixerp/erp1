@@ -51,9 +51,9 @@ templates/
 | Auth (NativeAuthController + fpCrypt) | Done |
 | CheckMenuAccess + ApplySelectedDatabase middleware | Done (gating works; full multi-DB switching is a follow-up) |
 | All 800 routes from `routes/web.php` (+ 1 closure for `/`) | Registered |
-| Implemented controllers | Item Master, Model Master, Stock Type, Gift Table, Native Auth, Native Dashboard |
-| Stub controllers | ~140 — return HTTP 501 |
-| Views/templates ported | login, dashboard, stub, item-master, model-master, stocktype, gift-table |
+| Implemented controllers | Item Master, Model Master, Stock Type, Gift Table, Native Auth, Native Dashboard, Native Customer, Sales Bill |
+| Stub controllers | ~138 — return HTTP 501 |
+| Views/templates ported | login, dashboard, stub, item-master, model-master, stocktype, gift-table, customer/list, customer/form, sales-bill/index |
 
 ## Running
 

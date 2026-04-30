@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">{{ title }}</h2>
+    <div>
+      <button class="btn muted" type="button" id="load-btn">Load saved bill</button>
+    </div>
+  </div>
+  {% csrf_token %}
+
+  <form id="bill-form" autocomplete="off">
+    <input type="hidden" name="form_mode" value="{{ mode }}">
+    <input type="hidden" name="is_quotation" value="{% if quotation %}1{% else %}0{% endif %}">
+
+    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:14px;">
+      <label>Bill No *<br>
+        <div style="display:flex; gap:4px;">
+          <input type="text" name="bill_no" required style="flex:1;">
+          <button class="btn muted" id="next-no-btn" type="button">Next</button>
+        </div>
+      </label>
+      <label>Bill Date<br>
+        <input type="date" name="bill_date" style="width:100%;">
+      </label>
+      <label>Bill Type<br>
+        <select name="bill_type" style="width:100%;">
+          <option>Gold</option><option>Silver</option><option>Diamond</option><option>Other</option>
+        </select>
+      </label>
+      <label>Rate / gm<br>
+        <input type="number" step="0.01" name="rate_per_gm" value="0" style="width:100%;">
+      </label>
+
+      <label style="grid-column: span 2;">Customer<br>
+        <input type="text" name="customer_name" id="cust-name" required style="width:100%;" placeholder="Search by name or mobile...">
+      </label>
+      <label>Customer Code<br>
+        <input type="text" name="customer_code" id="cust-code" style="width:100%;">
+      </label>
+      <label>Mobile<br>
+        <input type="text" name="mobile" id="cust-mobile" style="width:100%;">
+      </label>
+      <label style="grid-column: span 2;">Address<br>
+        <input type="text" name="address" id="cust-addr" style="width:100%;">
+      </label>
+      <label>State<br>
+        <input type="text" name="state_code" style="width:100%;">
+      </label>
+      <label>GST No<br>
+        <input type="text" name="gst_no" style="width:100%;">
+      </label>
+
+      <label>Counter<br>
+        <input type="text" name="counter_name" style="width:100%;">
+      </label>
+      <label>Salesman<br>
+        <input type="text" name="salesman_name" style="width:100%;">
+      </label>
+    </div>
+
+    <h3>Items</h3>
+    <table id="items-tbl">
+      <thead><tr>
+        <th>Item code</th><th>Qty</th><th>Weight</th><th>Stone wgt</th>
+        <th>Stone price</th><th>MC</th><th>Rate</th><th>Amount</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <button class="btn muted" type="button" id="add-row">+ Add row</button>
+
+    <div style="display:flex; justify-content:flex-end; gap:24px; margin-top:16px;">
+      <div>Bill total: <b id="tot-bill">0.00</b></div>
+      <div>Exchange: <b id="tot-exch">0.00</b></div>
+      <div>Return: <b id="tot-ret">0.00</b></div>
+      <div>Net: <b id="tot-net">0.00</b></div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn" type="submit">Save</button>
+      <button class="btn danger" type="button" id="cancel-btn">Cancel bill</button>
+      <button class="btn" type="button" id="confirm-btn" style="background:#15803d;">Confirm</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:10px;"></div>
+  </form>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+const tbody = document.querySelector('#items-tbl tbody');
+
+async function api(path, opts={}) {
+  const r = await fetch(path, {
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json', ...(opts.headers||{})},
+    ...opts,
+  });
+  return {status: r.status, body: await r.json().catch(() => ({}))};
+}
+
+function rowTemplate(values={}) {
+  const tr = document.createElement('tr');
+  const fields = ['item_code','qty','weight','stone_wgt','stone_price','making_charge','rate','amount'];
+  for (const f of fields) {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.name = f;
+    inp.type = (f === 'item_code') ? 'text' : 'number';
+    inp.step = '0.001';
+    inp.style.width = (f === 'item_code') ? '80px' : '70px';
+    inp.value = values[f] != null ? values[f] : (f === 'item_code' ? '' : '0');
+    inp.addEventListener('input', recalc);
+    td.appendChild(inp);
+    tr.appendChild(td);
+  }
+  const td = document.createElement('td');
+  const btn = document.createElement('button');
+  btn.textContent = 'x';
+  btn.className = 'btn danger';
+  btn.type = 'button';
+  btn.onclick = () => { tr.remove(); recalc(); };
+  td.appendChild(btn);
+  tr.appendChild(td);
+  return tr;
+}
+
+function recalc() {
+  let bill = 0;
+  for (const row of tbody.querySelectorAll('tr')) {
+    const get = (n) => parseFloat(row.querySelector(`input[name="${n}"]`).value) || 0;
+    const qty = get('qty'), wgt = get('weight'), sw = get('stone_wgt'),
+          sp = get('stone_price'), mc = get('making_charge'), rate = get('rate');
+    let amt = parseFloat(row.querySelector('input[name="amount"]').value) || 0;
+    if (amt === 0) {
+      const net = Math.max(wgt - sw, 0);
+      amt = net * rate + sp + mc;
+      row.querySelector('input[name="amount"]').value = amt.toFixed(2);
+    }
+    bill += amt;
+  }
+  document.getElementById('tot-bill').textContent = bill.toFixed(2);
+  document.getElementById('tot-net').textContent = bill.toFixed(2);
+}
+
+document.getElementById('add-row').onclick = () => { tbody.appendChild(rowTemplate()); };
+tbody.appendChild(rowTemplate());
+
+document.getElementById('next-no-btn').onclick = async () => {
+  const bt = document.querySelector('select[name="bill_type"]').value;
+  const r = await api('/api/sales-bill/next-number?seb=B&bill_type=' + encodeURIComponent(bt));
+  if (r.body.bill_no) {
+    document.querySelector('input[name="bill_no"]').value = r.body.bill_no;
+  }
+};
+
+document.getElementById('cust-mobile').addEventListener('blur', async () => {
+  const m = document.getElementById('cust-mobile').value.trim();
+  if (!m) return;
+  const r = await api('/api/sales-bill/customer-by-mobile?mobile=' + encodeURIComponent(m));
+  if (r.body.ok && r.body.data) {
+    document.getElementById('cust-name').value = r.body.data.name || '';
+    document.getElementById('cust-code').value = r.body.data.code || '';
+    document.getElementById('cust-addr').value = r.body.data.addr1 || '';
+  }
+});
+
+document.getElementById('bill-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  recalc();
+  const fd = new FormData(e.target);
+  const payload = {};
+  for (const [k, v] of fd.entries()) payload[k] = v;
+  payload.is_quotation = payload.is_quotation === '1';
+  payload.items = [...tbody.querySelectorAll('tr')].map(tr => {
+    const o = {};
+    for (const inp of tr.querySelectorAll('input')) o[inp.name] = inp.value;
+    return o;
+  });
+  payload.exchange = [];
+  payload.sales_return = [];
+  status.style.color = '#374151';
+  status.textContent = 'Saving...';
+  const r = await api('/api/sales-bill/save', {method: 'POST', body: JSON.stringify(payload)});
+  if (r.body.ok) {
+    status.style.color = '#15803d';
+    status.textContent = r.body.message + (r.body.next_bill_no ? ' — next #: ' + r.body.next_bill_no : '');
+  } else {
+    status.style.color = '#b91c1c';
+    status.textContent = r.body.message || ('HTTP ' + r.status);
+  }
+});
+
+document.getElementById('load-btn').onclick = async () => {
+  const bn = prompt('Enter bill number to load:');
+  if (!bn) return;
+  const r = await api('/api/sales-bill/get?bill_no=' + encodeURIComponent(bn));
+  if (!r.body.ok) { alert(r.body.message || 'Not found'); return; }
+  const d = r.body.data;
+  for (const k of ['bill_no','bill_date','bill_type','rate_per_gm','customer_name','customer_code',
+                   'mobile','address','state_code','gst_no','counter_name','salesman_name']) {
+    const el = document.querySelector(`[name="${k}"]`);
+    if (el) el.value = d[k] || '';
+  }
+  tbody.innerHTML = '';
+  (d.items || []).forEach(it => tbody.appendChild(rowTemplate(it)));
+  if (!tbody.children.length) tbody.appendChild(rowTemplate());
+  recalc();
+};
+
+document.getElementById('cancel-btn').onclick = async () => {
+  const bn = document.querySelector('input[name="bill_no"]').value.trim();
+  if (!bn) { alert('Enter bill no'); return; }
+  if (!confirm('Cancel and delete bill ' + bn + '?')) return;
+  const r = await api('/api/sales-bill/cancel', {method: 'POST', body: JSON.stringify({bill_no: bn})});
+  status.style.color = r.body.ok ? '#15803d' : '#b91c1c';
+  status.textContent = r.body.message || ('HTTP ' + r.status);
+};
+
+document.getElementById('confirm-btn').onclick = async () => {
+  const bn = document.querySelector('input[name="bill_no"]').value.trim();
+  if (!bn) { alert('Enter bill no'); return; }
+  const r = await api('/api/sales-bill/confirm', {method: 'POST', body: JSON.stringify({bill_no: bn})});
+  status.style.color = r.body.ok ? '#15803d' : '#b91c1c';
+  status.textContent = r.body.message || ('HTTP ' + r.status);
+};
+</script>
+{% endblock %}
