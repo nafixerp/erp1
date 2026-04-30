@@ -51,10 +51,12 @@ templates/
 | Auth (NativeAuthController + fpCrypt) | Done |
 | CheckMenuAccess + ApplySelectedDatabase middleware | Done (gating works; full multi-DB switching is a follow-up) |
 | All 800 routes from `routes/web.php` (+ 1 closure for `/`) | Registered |
-| Implemented controllers | Item Master, Model Master, Stock Type, Gift Table, Native Auth, Native Dashboard, Native Customer, Sales Bill, Stock |
-| Stub controllers | ~137 — return HTTP 501 |
-| Views/templates ported | login, dashboard, stub, item-master, model-master, stocktype, gift-table, customer/list, customer/form, sales-bill/index, stock/opening-stock, stock/list |
-| Sales -> inventory wiring | Sales bill save deducts qty/weight/stonewgt from `itemsstk` for the configured default stock type (best-effort; uses `stktype.def=1`). Returned in API as `stock_adjustment: {adjusted, skipped}`. |
+| Implemented controllers | Item Master, Model Master, Stock Type, Gift Table, Native Auth, Native Dashboard, Native Customer, Sales Bill, Sales Return, Stock, Receipt, Payment, Journal, DayBook, CashBook, StockSummary |
+| Stub controllers | ~131 — return HTTP 501 |
+| Views/templates ported | login, dashboard, stub, item-master, model-master, stocktype, gift-table, customer/list, customer/form, sales-bill/index, sales-return/index, stock/opening-stock, stock/list, receipt/index (used for Receipt + Payment), journal/index, daybook/index, reports/cashbook, reports/stock-summary |
+| Sales -> inventory wiring | Sales bill save deducts qty/weight/stonewgt from `itemsstk` for the configured default stock type. Sales return save adds the same back. Both report `stock_adjustment` / `stock_recovery` in the response. |
+| Cash side | Receipts/Payments/Journal post to `daybook` + `daybookpart` via `erpapp/daybook_helpers.py`, with column-aware writes, voucher-counter reservation (`generali`), and global slno from `SERIALNO`. Sales returns also post a daybook credit-note. |
+| Reports (read-only) | `/api/daybook`, `/api/cashbook`, `/api/stock-summary` aggregate over the legacy schema with date-range / incharge / metal-type filters. |
 
 ## Running
 

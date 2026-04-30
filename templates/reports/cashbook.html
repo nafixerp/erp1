@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Cash Book{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Cash Book</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <label class="muted">From <input type="date" id="from"></label>
+    <label class="muted">To <input type="date" id="to"></label>
+    <select id="ic"><option value="">All incharges</option></select>
+    <button class="btn" id="refresh">Refresh</button>
+  </div>
+
+  <div id="totals" class="muted" style="display:flex; gap:24px; margin-bottom:8px;"></div>
+
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Vch No</th><th>Particular</th><th>Other a/c</th><th>IC</th>
+      <th>Debit</th><th>Credit</th><th>Balance</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="muted">Pick a date range and click Refresh.</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('from').value = today;
+document.getElementById('to').value = today;
+
+async function refresh() {
+  const params = new URLSearchParams({
+    date1: document.getElementById('from').value,
+    date2: document.getElementById('to').value,
+    ic: document.getElementById('ic').value,
+  });
+  const r = await fetch('/api/cashbook?' + params.toString());
+  const b = await r.json();
+  // Populate IC dropdown once.
+  const icSel = document.getElementById('ic');
+  if (icSel.children.length <= 1 && (b.incharges || []).length) {
+    for (const ic of b.incharges) {
+      const opt = document.createElement('option');
+      opt.value = ic.code; opt.textContent = ic.name || ic.code;
+      icSel.appendChild(opt);
+    }
+  }
+  const tbody = document.getElementById('rows'); tbody.innerHTML = '';
+  for (const row of (b.rows || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.date || ''}</td><td>${row.vchno || ''}</td>
+      <td>${(row.particular || '').replace(/</g,'&lt;')}</td>
+      <td>${row.othacname || ''}</td><td>${row.ic || ''}</td>
+      <td>${row.debit ? row.debit.toFixed(2) : ''}</td>
+      <td>${row.credit ? row.credit.toFixed(2) : ''}</td>
+      <td>${Number(row.running_balance || 0).toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!(b.rows || []).length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="muted">No rows.</td></tr>';
+  }
+  const t = b.totals || {};
+  document.getElementById('totals').innerHTML =
+    `<div>Opening: <b>${Number(t.display_opening || 0).toFixed(2)}</b></div>` +
+    `<div>Debit: <b>${Number(t.debit || 0).toFixed(2)}</b></div>` +
+    `<div>Credit: <b>${Number(t.credit || 0).toFixed(2)}</b></div>` +
+    `<div>Closing: <b>${Number(t.display_closing || 0).toFixed(2)}</b></div>`;
+}
+document.getElementById('refresh').addEventListener('click', refresh);
+refresh();
+</script>
+{% endblock %}

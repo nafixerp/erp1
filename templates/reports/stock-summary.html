@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Stock Summary{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Stock Summary</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <label class="muted">As of <input type="date" id="date2"></label>
+    <select id="metal_type">
+      <option>All</option><option>Gold</option><option>Silver</option><option>Diamond</option>
+    </select>
+    <button class="btn" id="refresh">Refresh</button>
+  </div>
+
+  <div id="totals" class="muted" style="display:flex; gap:24px; margin-bottom:8px; flex-wrap:wrap;"></div>
+
+  <table>
+    <thead><tr>
+      <th>Code</th><th>Name</th><th>Type</th><th>Group</th>
+      <th>Op qty</th><th>Op wgt</th>
+      <th>Purch qty</th><th>Purch wgt</th>
+      <th>Sales qty</th><th>Sales wgt</th>
+      <th>Sret qty</th><th>Sret wgt</th>
+      <th>Close qty</th><th>Close wgt</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="14" class="muted">Click Refresh.</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+document.getElementById('date2').value = new Date().toISOString().slice(0,10);
+const fmt = (v) => Math.abs(Number(v) || 0) < 0.0001 ? '' : Number(v).toFixed(3).replace(/\.?0+$/, '');
+
+async function refresh() {
+  const params = new URLSearchParams({
+    date2: document.getElementById('date2').value,
+    metal_type: document.getElementById('metal_type').value,
+  });
+  const r = await fetch('/api/stock-summary?' + params.toString());
+  const b = await r.json();
+  const tbody = document.getElementById('rows'); tbody.innerHTML = '';
+  for (const row of (b.rows || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.code}</td><td>${row.name}</td>
+      <td>${row.itype}</td><td>${row.grpcode}</td>
+      <td>${fmt(row.opening_qty)}</td><td>${fmt(row.opening_weight)}</td>
+      <td>${fmt(row.purch_qty)}</td><td>${fmt(row.purch_weight)}</td>
+      <td>${fmt(row.sales_qty)}</td><td>${fmt(row.sales_weight)}</td>
+      <td>${fmt(row.sret_qty)}</td><td>${fmt(row.sret_weight)}</td>
+      <td>${fmt(row.closing_qty)}</td><td>${fmt(row.closing_weight)}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!(b.rows || []).length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="muted">No items.</td></tr>';
+  }
+  const t = b.totals || {};
+  document.getElementById('totals').innerHTML =
+    `<div>Items: <b>${(b.rows || []).length}</b></div>` +
+    `<div>Op wgt: <b>${fmt(t.opening_weight)}</b></div>` +
+    `<div>Purch wgt: <b>${fmt(t.purch_weight)}</b></div>` +
+    `<div>Sales wgt: <b>${fmt(t.sales_weight)}</b></div>` +
+    `<div>Closing wgt: <b>${fmt(t.closing_weight)}</b></div>` +
+    `<div>Gold close: <b>${fmt(t.gold_weight)}</b></div>` +
+    `<div>Silver close: <b>${fmt(t.silver_weight)}</b></div>`;
+}
+document.getElementById('refresh').addEventListener('click', refresh);
+refresh();
+</script>
+{% endblock %}

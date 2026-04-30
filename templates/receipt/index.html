@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ voucher_type }} Voucher{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">{{ voucher_type }} Voucher</h2>
+  {% csrf_token %}
+
+  <form id="voucher-form" autocomplete="off"
+        style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; max-width:900px;">
+    <label>Voucher No<br><input type="text" name="vchno" readonly style="width:100%; background:#f1f5f9;"></label>
+    <label>Date<br><input type="date" name="tdate" required style="width:100%;"></label>
+    <label>Cash / Bank<br>
+      <select name="cbcode" required style="width:100%;"></select>
+    </label>
+    <label>Amount<br><input type="number" step="0.01" name="amount" required style="width:100%;"></label>
+
+    <label style="grid-column: span 2;">Account (party)<br>
+      <input type="text" name="accode" placeholder="ACCODE" required style="width:100%;">
+    </label>
+    <label>Discount<br><input type="number" step="0.01" name="discount" value="0" style="width:100%;"></label>
+    <label>Balance<br><input type="text" name="balance" readonly style="width:100%; background:#f1f5f9;"></label>
+
+    <label style="grid-column: span 4;">Particulars<br>
+      <input type="text" name="particular" maxlength="200" style="width:100%;">
+    </label>
+
+    <label>Cheque #<br><input type="text" name="chequeno" style="width:100%;"></label>
+    <label>Cheque date<br><input type="date" name="chequedate" style="width:100%;"></label>
+    <label>Staff<br><input type="text" name="staff" style="width:100%;"></label>
+    <label class="muted" style="display:flex; align-items:end; gap:6px;">
+      <input type="checkbox" name="interstate"> Interstate
+    </label>
+
+    <div style="grid-column: span 4; display:flex; gap:8px; margin-top:6px;">
+      <button class="btn" type="submit">Save</button>
+      <button class="btn muted" id="reload" type="button">New voucher</button>
+      <button class="btn muted" id="show-list" type="button">List today</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </form>
+
+  <div id="list-wrap" style="margin-top:20px; display:none;">
+    <h3>Recent {{ voucher_type|lower }}s</h3>
+    <table>
+      <thead><tr><th>Date</th><th>Vch No</th><th>Party</th><th>CB</th><th>Amount</th><th>Particular</th><th></th></tr></thead>
+      <tbody id="list-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+const VTYPE = "{{ voucher_type }}";
+const apiUrl = VTYPE === 'Receipt' ? '/api/accounts/receipt' : '/api/accounts/payment';
+
+async function call(action, params={}) {
+  const r = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({action, ...params}),
+  });
+  return await r.json().catch(() => ({}));
+}
+
+async function init() {
+  const r = await call('init');
+  if (!r.success) { status.textContent = r.error || 'Init failed'; return; }
+  const cbSel = document.querySelector('select[name="cbcode"]');
+  cbSel.innerHTML = '';
+  for (const acc of (r.cb_accounts || [])) {
+    const opt = document.createElement('option');
+    opt.value = acc.accode;
+    opt.textContent = acc.accode + ' — ' + (acc.name || '');
+    if (acc.accode === r.default_cb) opt.selected = true;
+    cbSel.appendChild(opt);
+  }
+  document.querySelector('input[name="vchno"]').value = r.next_vchno || '';
+  document.querySelector('input[name="tdate"]').value = r.today || '';
+}
+
+async function refreshBalance() {
+  const accode = document.querySelector('input[name="accode"]').value.trim();
+  if (!accode) return;
+  const r = await call('load_account', {accode});
+  if (r.success) {
+    document.querySelector('input[name="balance"]').value =
+      r.balance.toFixed(2) + ' ' + r.balance_label;
+  }
+}
+document.querySelector('input[name="accode"]').addEventListener('blur', refreshBalance);
+
+document.getElementById('voucher-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data = {};
+  for (const [k, v] of fd.entries()) data[k] = v;
+  data.interstate = !!data.interstate;
+  status.textContent = 'Saving…'; status.style.color = '#374151';
+  const r = await call('save', data);
+  if (r.success) {
+    status.style.color = '#15803d';
+    status.textContent = 'Saved ' + r.vchno + '. Bal: ' + (r.balance ?? '');
+    document.querySelector('input[name="vchno"]').value = r.next_vchno || '';
+    document.querySelector('input[name="amount"]').value = '';
+    document.querySelector('input[name="discount"]').value = 0;
+    document.querySelector('input[name="particular"]').value = '';
+  } else {
+    status.style.color = '#b91c1c';
+    status.textContent = r.error || 'Save failed';
+  }
+});
+
+document.getElementById('reload').addEventListener('click', init);
+document.getElementById('show-list').addEventListener('click', async () => {
+  const today = new Date().toISOString().slice(0,10);
+  const r = await call('list', {from: today, to: today});
+  const tbody = document.getElementById('list-body');
+  tbody.innerHTML = '';
+  for (const row of (r.rows || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.tdate || ''}</td><td>${row.vchno || ''}</td>
+      <td>${row.party || ''}</td><td>${row.cb || ''}</td>
+      <td>${Number(row.amount || 0).toFixed(2)}</td>
+      <td>${(row.particular || '').replace(/</g,'&lt;')}</td>
+      <td><button class="btn danger" data-slno="${row.slno}" type="button">Delete</button></td>`;
+    tbody.appendChild(tr);
+  }
+  for (const btn of tbody.querySelectorAll('button[data-slno]')) {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete voucher?')) return;
+      const r = await call('delete', {slno: btn.dataset.slno});
+      if (r.success) btn.closest('tr').remove();
+      else alert(r.error || 'Failed');
+    });
+  }
+  document.getElementById('list-wrap').style.display = '';
+});
+
+init();
+</script>
+{% endblock %}

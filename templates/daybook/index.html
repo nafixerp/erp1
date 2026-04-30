@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Day Book{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Day Book</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <label class="muted">From <input type="date" id="from"></label>
+    <label class="muted">To <input type="date" id="to"></label>
+    <input type="text" id="accode" placeholder="Filter by account code (optional)">
+    <button class="btn" id="refresh">Refresh</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <div id="totals" class="muted" style="display:flex; gap:24px; margin-bottom:8px;"></div>
+
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Vch No</th><th>Account</th><th>Debit</th><th>Credit</th>
+      <th>Particular</th><th>Other a/c</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="7" class="muted">Pick a date range and click Refresh.</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('from').value = today;
+document.getElementById('to').value = today;
+
+async function refresh() {
+  const params = new URLSearchParams({
+    from: document.getElementById('from').value,
+    to: document.getElementById('to').value,
+    accode: document.getElementById('accode').value.trim(),
+  });
+  const r = await fetch('/api/daybook?' + params.toString());
+  const body = await r.json();
+  const tbody = document.getElementById('rows'); tbody.innerHTML = '';
+  for (const row of (body.rows || [])) {
+    const amt = Number(row.amount || 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.tdate || ''}</td><td>${row.vchno || ''}</td>
+      <td>${row.accode || ''}</td>
+      <td>${amt > 0 ? amt.toFixed(2) : ''}</td>
+      <td>${amt < 0 ? Math.abs(amt).toFixed(2) : ''}</td>
+      <td>${(row.particular || '').replace(/</g,'&lt;')}</td>
+      <td>${row.opaccode || ''}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!(body.rows || []).length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">No entries.</td></tr>';
+  }
+  const t = body.totals || {};
+  document.getElementById('totals').innerHTML =
+    `<div>Debit total: <b>${Number(t.debit || 0).toFixed(2)}</b></div>` +
+    `<div>Credit total: <b>${Number(t.credit || 0).toFixed(2)}</b></div>`;
+}
+document.getElementById('refresh').addEventListener('click', refresh);
+refresh();
+</script>
+{% endblock %}

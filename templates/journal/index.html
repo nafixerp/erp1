@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Journal Voucher{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Journal Voucher</h2>
+  {% csrf_token %}
+
+  <form id="jv-form" autocomplete="off"
+        style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; max-width:900px;">
+    <label>Voucher No<br><input type="text" name="vchno" readonly style="width:100%; background:#f1f5f9;"></label>
+    <label>Date<br><input type="date" name="tdate" required style="width:100%;"></label>
+    <label style="grid-column: span 2;">Particulars<br>
+      <input type="text" name="particular" maxlength="200" style="width:100%;">
+    </label>
+
+    <label style="grid-column: span 2;">Debit Account<br>
+      <input type="text" name="debit_accode" required style="width:100%;">
+    </label>
+    <label style="grid-column: span 2;">Credit Account<br>
+      <input type="text" name="credit_accode" required style="width:100%;">
+    </label>
+    <label>Amount<br><input type="number" step="0.01" name="amount" required style="width:100%;"></label>
+
+    <div style="grid-column: span 4; display:flex; gap:8px; margin-top:6px;">
+      <button class="btn" type="submit">Save</button>
+      <button class="btn muted" id="show-list" type="button">List recent</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </form>
+
+  <div id="list-wrap" style="margin-top:20px; display:none;">
+    <h3>Recent journal vouchers</h3>
+    <table>
+      <thead><tr><th>Date</th><th>Vch No</th><th>Debit</th><th>Credit</th><th>Amount</th><th>Particular</th></tr></thead>
+      <tbody id="list-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+
+async function call(action, params={}) {
+  const r = await fetch('/api/accounts/journal', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({action, ...params}),
+  });
+  return await r.json().catch(() => ({}));
+}
+async function init() {
+  const r = await call('init');
+  if (r.success) {
+    document.querySelector('input[name="vchno"]').value = r.next_vchno || '';
+    document.querySelector('input[name="tdate"]').value = r.today || '';
+  }
+}
+document.getElementById('jv-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data = {}; for (const [k, v] of fd.entries()) data[k] = v;
+  status.textContent = 'Saving…'; status.style.color = '#374151';
+  const r = await call('save', data);
+  if (r.success) {
+    status.style.color = '#15803d';
+    status.textContent = 'Saved ' + r.vchno;
+    document.querySelector('input[name="vchno"]').value = r.next_vchno || '';
+    document.querySelector('input[name="amount"]').value = '';
+    document.querySelector('input[name="particular"]').value = '';
+  } else {
+    status.style.color = '#b91c1c';
+    status.textContent = r.error || 'Save failed';
+  }
+});
+document.getElementById('show-list').addEventListener('click', async () => {
+  const r = await call('list');
+  const tbody = document.getElementById('list-body'); tbody.innerHTML = '';
+  for (const row of (r.rows || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.tdate || ''}</td><td>${row.vchno || ''}</td>
+      <td>${row.debit || ''}</td><td>${row.credit || ''}</td>
+      <td>${Number(row.amount || 0).toFixed(2)}</td>
+      <td>${(row.particular || '').replace(/</g,'&lt;')}</td>`;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('list-wrap').style.display = '';
+});
+init();
+</script>
+{% endblock %}

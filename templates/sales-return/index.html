@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">{{ title }}</h2>
+  {% csrf_token %}
+
+  <form id="ret-form" autocomplete="off">
+    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
+      <label>Return No *<br>
+        <div style="display:flex; gap:4px;">
+          <input type="text" name="bill_no" required style="flex:1;">
+          <button class="btn muted" id="next-no" type="button">Next</button>
+        </div>
+      </label>
+      <label>Date<br><input type="date" name="bill_date" style="width:100%;"></label>
+      <label style="grid-column: span 2;">Source bill (optional)<br>
+        <div style="display:flex; gap:4px;">
+          <input type="text" name="source_bill_no" id="src-bill" placeholder="Search by bill no / customer / mobile" style="flex:1;">
+          <button class="btn muted" id="src-search" type="button">Find</button>
+        </div>
+      </label>
+
+      <label style="grid-column: span 2;">Customer<br>
+        <input type="text" name="customer_name" required style="width:100%;">
+      </label>
+      <label>Customer Code<br>
+        <input type="text" name="customer_code" style="width:100%;">
+      </label>
+      <label>Mobile<br>
+        <input type="text" name="mobile" style="width:100%;">
+      </label>
+    </div>
+
+    <h3>Returned Items</h3>
+    <table id="items-tbl">
+      <thead><tr><th>Item code</th><th>Qty</th><th>Weight</th><th>Stone wgt</th><th>Rate</th><th>Amount</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button class="btn muted" type="button" id="add-row">+ Add row</button>
+
+    <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+      <div>Return total: <b id="tot">0.00</b></div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn" type="submit">Save Return</button>
+      <button class="btn danger" type="button" id="delete-btn">Delete</button>
+      <span id="status" class="muted" style="margin-left:auto;"></span>
+    </div>
+  </form>
+</div>
+
+<script>
+const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const status = document.getElementById('status');
+const tbody = document.querySelector('#items-tbl tbody');
+
+function rowTemplate(values={}) {
+  const tr = document.createElement('tr');
+  for (const f of ['item_code','qty','weight','stone_wgt','rate','amount']) {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.name = f;
+    inp.type = (f === 'item_code') ? 'text' : 'number';
+    inp.step = '0.001';
+    inp.value = values[f] != null ? values[f] : (f === 'item_code' ? '' : '0');
+    inp.style.width = (f === 'item_code') ? '90px' : '70px';
+    inp.addEventListener('input', recalc);
+    td.appendChild(inp);
+    tr.appendChild(td);
+  }
+  const td = document.createElement('td');
+  const btn = document.createElement('button');
+  btn.textContent = 'x'; btn.className = 'btn danger'; btn.type = 'button';
+  btn.onclick = () => { tr.remove(); recalc(); };
+  td.appendChild(btn); tr.appendChild(td);
+  return tr;
+}
+function recalc() {
+  let tot = 0;
+  for (const tr of tbody.querySelectorAll('tr')) {
+    const get = (n) => parseFloat(tr.querySelector(`input[name="${n}"]`).value) || 0;
+    let amt = get('amount');
+    if (amt === 0) {
+      const net = Math.max(get('weight') - get('stone_wgt'), 0);
+      amt = net * get('rate');
+      tr.querySelector('input[name="amount"]').value = amt.toFixed(2);
+    }
+    tot += amt;
+  }
+  document.getElementById('tot').textContent = tot.toFixed(2);
+}
+document.getElementById('add-row').onclick = () => { tbody.appendChild(rowTemplate()); };
+tbody.appendChild(rowTemplate());
+
+document.getElementById('next-no').onclick = async () => {
+  const r = await fetch('/api/sales-return/next-number');
+  const b = await r.json();
+  if (b.bill_no) document.querySelector('input[name="bill_no"]').value = b.bill_no;
+};
+
+document.getElementById('src-search').onclick = async () => {
+  const q = document.getElementById('src-bill').value.trim();
+  const r = await fetch('/api/sales-return/search-bill?q=' + encodeURIComponent(q));
+  const b = await r.json();
+  if (!b.rows || !b.rows.length) { alert('No matching bill.'); return; }
+  // Auto-pick first match.
+  const m = b.rows[0];
+  document.getElementById('src-bill').value = m.bill_no;
+  document.querySelector('input[name="customer_name"]').value = m.customer_name || '';
+  document.querySelector('input[name="customer_code"]').value = m.customer_code || '';
+  document.querySelector('input[name="mobile"]').value = m.mobile || '';
+  tbody.innerHTML = '';
+  for (const it of (m.items || [])) tbody.appendChild(rowTemplate(it));
+  if (!tbody.children.length) tbody.appendChild(rowTemplate());
+  recalc();
+};
+
+document.getElementById('ret-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  recalc();
+  const fd = new FormData(e.target);
+  const payload = {}; for (const [k, v] of fd.entries()) payload[k] = v;
+  payload.items = [...tbody.querySelectorAll('tr')].map(tr => {
+    const o = {}; for (const inp of tr.querySelectorAll('input')) o[inp.name] = inp.value;
+    return o;
+  });
+  status.textContent = 'Saving…'; status.style.color = '#374151';
+  const r = await fetch('/api/sales-return/save', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const b = await r.json();
+  if (b.ok) {
+    status.style.color = '#15803d';
+    status.textContent = b.message + (b.daybook && b.daybook.posted ? ' (DB ' + b.daybook.vchno + ')' : '');
+  } else {
+    status.style.color = '#b91c1c';
+    status.textContent = b.message || ('HTTP ' + r.status);
+  }
+});
+
+document.getElementById('delete-btn').addEventListener('click', async () => {
+  const bn = document.querySelector('input[name="bill_no"]').value.trim();
+  if (!bn) { alert('Enter return no'); return; }
+  if (!confirm('Delete return ' + bn + '?')) return;
+  const r = await fetch('/api/sales-return/delete', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+    body: JSON.stringify({bill_no: bn}),
+  });
+  const b = await r.json();
+  status.style.color = b.ok ? '#15803d' : '#b91c1c';
+  status.textContent = b.message || ('HTTP ' + r.status);
+});
+</script>
+{% endblock %}

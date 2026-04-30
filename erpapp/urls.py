@@ -11,7 +11,10 @@ Add new overrides in `OVERRIDES` as you port more controllers.
 from django.urls import path
 
 from . import _generated_urls
-from .views import auth_views, core_views, customers, masters, sales_bill, stock
+from .views import (
+    auth_views, cashflow, core_views, customers, masters,
+    reports, sales_bill, sales_return, stock,
+)
 
 
 # Map URL `name` -> hand-implemented view callable.
@@ -75,6 +78,24 @@ OVERRIDES = {
     "stock.update": stock.update,
     "stock.stockList": stock.stock_list,
     "stock.stockListData": stock.stock_list_data,
+
+    # day book + cashbook + stock summary
+    "daybook.index": cashflow.daybook_index,
+    "cashbook.index": reports.cashbook_index,
+    "stocksummaryratewise.index": reports.stock_summary_index,
+    "stocksummaryratewise.show": reports.stock_summary_index,
+    "stocksummarycostwise.index": reports.stock_summary_index,
+    "stocksummarycostwise.show": reports.stock_summary_index,
+
+    # sales return (SalesReturnController)
+    "salesreturn.index": sales_return.index,
+    "salesreturn.nextNumber": sales_return.next_number,
+    "salesreturn.getList": sales_return.get_list,
+    "salesreturn.get": sales_return.get,
+    "salesreturn.searchSaleBill": sales_return.search_sale_bill,
+    "salesreturn.searchSaleBills": sales_return.search_sale_bill,
+    "salesreturn.save": sales_return.save,
+    "salesreturn.delete": sales_return.delete,
 }
 
 urlpatterns = [
@@ -87,4 +108,19 @@ urlpatterns = [
     # Alias for the Laravel route `/sales-bill/{mode?}` whose optional segment
     # got compiled to a required Django `<str:mode>`.
     path("sales-bill", sales_bill.index, name="sales-bill.bare"),
+    path("sales-return", sales_return.index, name="sales-return.bare"),
+
+    # Receipt/Payment/Journal — Laravel routes use FQN class refs which the
+    # generator skipped, so wire them by hand.
+    path("accounts/receipt", cashflow.receipt_index, name="receipt.index"),
+    path("api/accounts/receipt", cashflow.receipt_api, name="receipt.api"),
+    path("accounts/payment", cashflow.payment_index, name="payment.index"),
+    path("api/accounts/payment", cashflow.payment_api, name="payment.api"),
+    path("accounts/journal", cashflow.journal_index, name="journal.index"),
+    path("api/accounts/journal", cashflow.journal_api, name="journal.api"),
+
+    # Aggregator JSON endpoints introduced by the Django port.
+    path("api/daybook", cashflow.daybook_api, name="daybook.api"),
+    path("api/cashbook", reports.cashbook_api, name="cashbook.api"),
+    path("api/stock-summary", reports.stock_summary_data, name="stocksummary.api"),
 ] + _generated_urls.build_patterns(view_overrides=OVERRIDES)

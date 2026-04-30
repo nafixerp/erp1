@@ -544,6 +544,20 @@ def _save_direct(code: str, level: int, is_opening: bool, v: dict,
 # Cross-module helper for sales bill -> deduct inventory
 # ---------------------------------------------------------------------------
 
+def apply_sales_return_recovery(items: Iterable[dict], default_stktype: Optional[str] = None) -> dict:
+    """Inverse of apply_sales_bill_deduction — adds stock back."""
+    inverted = []
+    for line in items:
+        line = dict(line)
+        line["qty"] = -_to_num(line.get("qty"))
+        line["weight"] = -_to_num(line.get("weight"))
+        line["stone_wgt"] = -_to_num(line.get("stone_wgt"))
+        inverted.append(line)
+    summary = apply_sales_bill_deduction(inverted, default_stktype)
+    summary["recovered"] = summary.pop("adjusted", 0)
+    return summary
+
+
 def apply_sales_bill_deduction(items: Iterable[dict], default_stktype: Optional[str] = None) -> dict:
     """
     Subtract sold qty/weight/stonewgt from the buyer's stock type.
